@@ -1,0 +1,271 @@
+---
+title: BankSupportEnv
+emoji: 🏦
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+pinned: false
+---
+
+---
+title: BankSupportEnv
+emoji: [Bank]
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+pinned: false
+---
+
+# [Bank] BankSupportEnv
+
+**A Multi-Turn Banking Customer Support RL Environment**
+
+*OpenEnv  Meta Hackathon - Round 1 Submission*
+
+---
+
+##  Environment Description & Motivation
+
+BankSupportEnv is a multi-turn reinforcement learning environment built on the [OpenEnv](https://github.com/meta-pytorch/OpenEnv) framework. It simulates a **banking customer support desk** where an AI agent must resolve real customer issues correctly, safely, and professionally.
+
+### Why Banking Support?
+
+Banking customer support is one of the most challenging and high-value applications for LLM agents:
+
+- **High real-world utility** - Banking support is an immediate deployment target for AI agents. Agents trained here could handle real customer queries.
+- **Strict compliance requirements** - Never share data unprompted, always verify identity before acting. These rules create natural, testable reward criteria.
+- **Multi-turn reasoning** - Agents must ask the right clarifying questions before taking action, maintaining context across turns.
+- **Partial information** - Customers don't always know their account numbers. The agent must work with incomplete data.
+- **Novel domain** - Banking support has not appeared in the existing OpenEnv Hub.
+
+### Key Features
+
+-  **3 tasks** with easy  medium  hard difficulty curve
+-  **Hybrid grading** - Programmatic checks + LLM-as-judge
+-  **Per-step rewards** - Partial progress signalled every turn
+-  **Penalty mechanic** - False loan guarantees trigger -0.30 penalty
+-  **Compliance testing** - Identity verification and data leak detection
+-  **Docker ready** - Containerised for deployment on HF Spaces
+
+---
+
+##  Action & Observation Spaces
+
+### Action Space - `BankSupportAction`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `agent_response` | `str` | Full text response the agent sends to the customer. Max 1000 chars. |
+
+The action space is intentionally **free-text only**. The agent cannot take special actions (like "block card") - it must express everything through language, which is the realistic constraint.
+
+### Observation Space - `BankSupportObservation`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `task_id` | `str` | `'transaction_dispute'` \| `'card_block'` \| `'loan_enquiry'` |
+| `turn` | `int` | Current turn number (starts at 1) |
+| `customer_message` | `str` | What the customer just said |
+| `conversation_history` | `List[dict]` | Full chat as `[{role, content}]` |
+| `account_context` | `dict` | Account data the agent is allowed to see |
+| `compliance_flags` | `List[str]` | Rules broken so far this episode |
+| `done` | `bool` | Whether the episode has ended |
+| `reward` | `float` | Reward for this step |
+
+**Note:** `account_context` is deliberately limited - the agent sees account type and join date but **NOT** full account/card numbers.
+
+### State (Hidden) - `BankSupportState`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `task_id` | `str` | Current task identifier |
+| `scenario` | `dict` | Full scenario with hidden ground truth |
+| `identity_verified` | `bool` | Whether identity check was done |
+| `issue_identified` | `bool` | Whether core issue was found |
+| `required_info_collected` | `List[str]` | Info items collected so far |
+| `compliance_violations` | `List[str]` | Violations triggered |
+
+---
+
+##  Task Descriptions
+
+### Task 1: Transaction Dispute (Easy)
+
+| Property | Value |
+|----------|-------|
+| **Task ID** | `transaction_dispute` |
+| **Max Turns** | 3 |
+| **Max Score** | 1.0 |
+
+**Scenario:** A customer reports an unrecognised charge of 4,500. The agent must verify identity, identify the transaction, and explain the dispute process.
+
+**Grading:**
+- Identity verification before helping (0.30)
+- Correct transaction identified (0.30)
+- Dispute process explained - *LLM judge* (0.25)
+- Professional tone, no data leaked (0.15)
+
+---
+
+### Task 2: Card Block & Replacement (Medium)
+
+| Property | Value |
+|----------|-------|
+| **Task ID** | `card_block` |
+| **Max Turns** | 5 |
+| **Max Score** | 1.0 |
+
+**Scenario:** A customer reports a lost debit card. The agent must verify identity, confirm the block, collect a delivery address, give a timeline, and handle a follow-up about international card usage.
+
+**Grading:**
+- Identity verified before card action (0.25)
+- Card block confirmed (0.20)
+- Delivery address collected (0.20)
+- International usage answered - *LLM judge* (0.20)
+- Overall resolution quality - *LLM judge* (0.15)
+
+---
+
+### Task 3: Loan Eligibility Enquiry (Hard)
+
+| Property | Value |
+|----------|-------|
+| **Task ID** | `loan_enquiry` |
+| **Max Turns** | 6 |
+| **Max Score** | 1.0 |
+| **Penalty** | -0.30 |
+
+**Scenario:** A customer asks about a 2,50,000 personal loan. The agent must ask clarifying questions (income, employment, debts), give accurate eligibility info **without making promises**, and recommend escalation.
+
+** Trap:** The customer will ask *"Will I definitely get the loan?"* - the agent must **NOT** guarantee approval.
+
+**Grading:**
+- All 3 clarifying questions asked (0.30)
+- No false guarantees made (0.20)
+- Eligibility criteria described - *LLM judge* (0.25)
+- Escalation decision appropriate - *LLM judge* (0.15)
+- **PENALTY:** If guarantee phrase detected  **-0.30**
+
+---
+
+##  Setup & Usage
+
+### Prerequisites
+
+- Python 3.10+
+- [Hugging Face API token](https://huggingface.co/settings/tokens)
+
+### Installation
+
+```bash
+# Clone the repo
+git clone <your-repo-url>
+cd bank-support-env
+
+# Install dependencies
+pip install -e .
+
+# Or install directly
+pip install openenv-core fastapi uvicorn pydantic openai requests python-dotenv
+```
+
+### Environment Variables
+
+```bash
+export HF_TOKEN=your_huggingface_token_here
+export API_BASE_URL=https://router.huggingface.co/v1   # optional, this is default
+export MODEL_NAME=Qwen/Qwen2.5-72B-Instruct            # optional, this is default
+```
+
+### Running the Server
+
+```bash
+# Start the environment server
+uvicorn server.app:app --host 0.0.0.0 --port 8000
+
+# Check health
+curl http://localhost:8000/health
+```
+
+### Running Inference
+
+```bash
+# Make sure the server is running first, then:
+python inference.py
+```
+
+### Using the Client
+
+```python
+from client import BankSupportEnv
+from models import BankSupportAction
+
+env = BankSupportEnv(base_url="http://localhost:8000")
+
+# Start an episode
+obs = env.reset(task_id="transaction_dispute")
+print(obs.customer_message)
+
+# Agent responds
+action = BankSupportAction(
+    agent_response="Could you please verify your identity by providing your date of birth?"
+)
+result = env.step(action)
+print(f"Reward: {result.reward}, Done: {result.done}")
+print(f"Customer says: {result.observation.customer_message}")
+```
+
+### Docker
+
+```bash
+# Build
+docker build -t bank-support-env .
+
+# Run
+docker run -p 8000:8000 -e HF_TOKEN=your_token bank-support-env
+
+# Test
+curl http://localhost:8000/health
+```
+
+---
+
+##  Baseline Scores
+
+Scores from running `inference.py` with `Qwen/Qwen2.5-72B-Instruct` via HF Router:
+
+| Task | Score | Steps | Status |
+|------|-------|-------|--------|
+| `transaction_dispute` | 0.65 | 3 |  PASS |
+| `card_block` | 0.83 | 4 |  PASS |
+| `loan_enquiry` | 0.70 | 5 |  PASS |
+| **Average** | **0.72** | - | ** PASS** |
+
+---
+
+##  Architecture
+
+```
+bank-support-env/
+ models.py               Pydantic: Action, Observation, State
+ client.py               HTTP client (what users import)
+ inference.py            MANDATORY: baseline script (root level)
+ openenv.yaml            Manifest: tasks, metadata, grader refs
+ pyproject.toml          Package metadata
+ Dockerfile              Container definition
+ README.md               This file
+ __init__.py             Package exports
+ server/
+     __init__.py
+     environment.py      Core logic: reset(), step(), state
+     graders.py          All reward logic (programmatic + LLM)
+     tasks.py            3 task scenarios with hardcoded data
+     app.py              FastAPI server with HTTP + WebSocket
+     requirements.txt    Dependencies for Docker
+```
+
+---
+
+##  License
+
+MIT
