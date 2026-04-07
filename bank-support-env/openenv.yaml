@@ -1,0 +1,31 @@
+# BankSupportEnv - OpenEnv Manifest
+name: bank-support-env
+version: 1.0.0
+description: "Banking customer support agent that handles transaction disputes, card blocks, and loan enquiries."
+tasks:
+  - id: transaction_dispute
+    name: "Transaction Dispute"
+    description: "Handle customer disputes for unauthorized transactions."
+    max_steps: 3
+    complexity: easy
+  - id: card_block
+    name: "Card Block"
+    description: "Securely block a customer's debit card and arrange replacement."
+    max_steps: 5
+    complexity: medium
+  - id: loan_enquiry
+    name: "Loan Enquiry"
+    description: "Assess customer eligibility for a personal loan without giving false guarantees."
+    max_steps: 6
+    complexity: hard
+
+metadata:
+  difficulty: "intermediate"
+  categories: ["finance", "multi-turn", "safety"]
+  author: "AryaShivam"
+
+runtime:
+  standard: "openenv-http/1.x"
+  mode: "simulation"
+  server_command: "uv run server"
+  base_url: "http://localhost:7860"
