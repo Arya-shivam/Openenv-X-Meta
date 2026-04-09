@@ -267,13 +267,17 @@ def main():
     print("=" * 60)
 
     try:
-        # Initialize clients
-        api_key = os.getenv("OPENAI_API_KEY")
+        # Initialize clients using hackathon proxy if available, otherwise fallback to local env
+        api_key = os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY")
+        api_base = os.getenv("API_BASE_URL")
+        
         if not api_key:
-            print("\n[INFO] OPENAI_API_KEY not set. Running in MOCK MODE for validation.", file=sys.stderr)
+            print("\n[INFO] No API key found. Running in MOCK MODE for validation.", file=sys.stderr)
             llm_client = None
         else:
-            llm_client = OpenAI(api_key=api_key)
+            # Initialize with proxy if provided, otherwise standard OpenAI base
+            llm_client = OpenAI(api_key=api_key, base_url=api_base)
+            print(f"[INFO] Initialized LLM client (Proxy: {api_base if api_base else 'Standard'})")
         
         # Check server reachability before proceeding
         print(f"[INFO] Connecting to environment at {ENV_BASE_URL}...")

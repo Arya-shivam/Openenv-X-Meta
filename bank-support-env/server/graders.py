@@ -317,11 +317,14 @@ def _call_llm_judge(
 
         model_name = os.environ.get("MODEL_NAME", "gpt-5.4")
 
-        api_key = os.environ.get("OPENAI_API_KEY")
+        api_key = os.environ.get("API_KEY") or os.environ.get("OPENAI_API_KEY")
+        api_base = os.environ.get("API_BASE_URL")
+        
         if not api_key:
-            logger.warning("OPENAI_API_KEY not set - LLM judge returning 0.5")
+            logger.warning("No API key found - LLM judge returning 0.5")
             return 0.5
-        client = OpenAI(api_key=api_key)
+            
+        client = OpenAI(api_key=api_key, base_url=api_base)
 
         prompt = JUDGE_PROMPT_TEMPLATE.format(
             customer_message=customer_message,
